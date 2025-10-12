@@ -27,6 +27,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.njsproj
+*.sln
+
+# macOS hidden files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
 *.sw?
 
 # Backend logs
