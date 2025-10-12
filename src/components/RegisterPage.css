@@ -1,0 +1,212 @@
+/* Lavender/Purple color scheme */
+
+.register-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #D4C9E7;
+    /* Light Lavender/Lilac */
+    padding: 20px;
+}
+
+.register-card {
+    background: #B7A0D0;
+    /* Medium Lavender/Light Purple */
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+    width: 100%;
+    max-width: 480px;
+    padding: 40px;
+}
+
+.register-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.logo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.logo img {
+    width: 120px;
+    height: auto;
+    max-width: 100%;
+}
+
+.register-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #FFFFFF;
+    /* White text */
+    margin: 0 0 8px 0;
+}
+
+.subtitle {
+    font-size: 14px;
+    color: #F0F0F0;
+    /* Very Light Gray */
+    margin: 0;
+}
+
+.register-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.message {
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.message-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.message-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #FFFFFF;
+    /* White text */
+}
+
+.required {
+    color: #E7594B;
+    /* Orange-Red from logo */
+}
+
+.form-group input {
+    padding: 12px 16px;
+    font-size: 14px;
+    border: 1px solid #8A74A4;
+    border-radius: 6px;
+    transition: all 0.2s;
+    outline: none;
+    background-color: #8A74A4;
+    /* Darker Purple/Muted Plum */
+    color: #FFFFFF;
+    /* White text */
+}
+
+.form-group input::placeholder {
+    color: #D0C5E6;
+    /* Light placeholder text */
+}
+
+.form-group input:focus {
+    border-color: #4B8AE7;
+    /* Medium Blue from logo */
+    box-shadow: 0 0 0 3px rgba(75, 138, 231, 0.2);
+}
+
+.form-group input.error {
+    border-color: #E7594B;
+    /* Orange-Red */
+}
+
+.form-group input.error:focus {
+    box-shadow: 0 0 0 3px rgba(231, 89, 75, 0.2);
+}
+
+.form-group input:disabled {
+    background-color: #9B8BB5;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.error-text {
+    font-size: 13px;
+    color: #E7594B;
+    /* Orange-Red */
+    margin-top: -4px;
+    font-weight: 500;
+}
+
+.btn-primary {
+    padding: 14px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #4B8AE7;
+    /* Medium Blue text */
+    background: #D0C5E6;
+    /* Very Light Purple/Mauve */
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #C4B8DC;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(75, 138, 231, 0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-primary:disabled {
+    background: #9B8BB5;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.register-footer {
+    margin-top: 24px;
+    text-align: center;
+    padding-top: 24px;
+    border-top: 1px solid #9B8BB5;
+}
+
+.register-footer p {
+    font-size: 14px;
+    color: #F0F0F0;
+    /* Very Light Gray */
+    margin: 0;
+}
+
+.register-footer a {
+    color: #4B8AE7;
+    /* Medium Blue */
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.register-footer a:hover {
+    text-decoration: underline;
+    color: #E7594B;
+    /* Orange-Red on hover */
+}
+
+/* Responsive design */
+@media (max-width: 576px) {
+    .register-card {
+        padding: 24px;
+    }
+
+    .register-header h1 {
+        font-size: 24px;
+    }
+}
