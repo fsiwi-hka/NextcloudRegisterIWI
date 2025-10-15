@@ -27,43 +27,77 @@ const logger = {
         }
     },
 
+    // Sanitize sensitive data before logging
+    sanitize: (data) => {
+        if (!data || typeof data !== 'object') return data;
+        const sanitized = { ...data };
+
+        // Remove sensitive fields
+        const sensitiveFields = ['rzPassword', 'password', 'token', 'secret', 'apiKey', 'authorization'];
+        sensitiveFields.forEach(field => {
+            if (sanitized[field]) {
+                sanitized[field] = '[REDACTED]';
+            }
+        });
+
+        return sanitized;
+    },
+
     info: (message, data = {}) => {
-        const logEntry = `[INFO] ${new Date().toISOString()} - ${message} ${JSON.stringify(data)}`;
+        const safeData = logger.sanitize(data);
+        const logEntry = `[INFO] ${new Date().toISOString()} - ${message} ${JSON.stringify(safeData)}`;
         console.log(logEntry);
         logger.writeToFile(logEntry);
     },
 
     error: (message, error = {}) => {
-        const logEntry = `[ERROR] ${new Date().toISOString()} - ${message} ${JSON.stringify(error)}`;
+        const safeError = logger.sanitize(error);
+        const logEntry = `[ERROR] ${new Date().toISOString()} - ${message} ${JSON.stringify(safeError)}`;
         console.error(logEntry);
         logger.writeToFile(logEntry);
     },
 
     warn: (message, data = {}) => {
-        const logEntry = `[WARN] ${new Date().toISOString()} - ${message} ${JSON.stringify(data)}`;
+        const safeData = logger.sanitize(data);
+        const logEntry = `[WARN] ${new Date().toISOString()} - ${message} ${JSON.stringify(safeData)}`;
         console.warn(logEntry);
         logger.writeToFile(logEntry);
     },
 
     debug: (message, data = {}) => {
         if (process.env.NODE_ENV === 'development') {
-            const logEntry = `[DEBUG] ${new Date().toISOString()} - ${message} ${JSON.stringify(data)}`;
+            const safeData = logger.sanitize(data);
+            const logEntry = `[DEBUG] ${new Date().toISOString()} - ${message} ${JSON.stringify(safeData)}`;
             console.debug(logEntry);
             logger.writeToFile(logEntry);
         }
     }
-};
-
-// Middleware
+};// Middleware
 app.use(cors());
 app.use(express.json());
 
+// Security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
+    // Don't log passwords
+    const safeBody = req.body ? { ...req.body } : {};
+    if (safeBody.rzPassword) {
+        safeBody.rzPassword = '[REDACTED]';
+    }
+
     logger.info(`Incoming ${req.method} request`, {
         path: req.path,
         ip: req.ip,
-        userAgent: req.get('user-agent')
+        userAgent: req.get('user-agent'),
+        body: safeBody
     });
     next();
 });
@@ -79,12 +113,60 @@ const RAUMZEIT_URL = process.env.RAUMZEIT_URL;
 app.post('/api/auth', async (req, res) => {
     try {
         const { rzUsername, rzPassword } = req.body;
+
+        // Validate input
+        if (!rzUsername || !rzPassword) {
+            logger.warn('Missing credentials', { rzUsername: rzUsername ? 'provided' : 'missing' });
+            return res.status(400).json({
+                success: false,
+                message: 'Username and password are required'
+            });
+        }
+
+        // Input validation - prevent injection attacks
+        if (typeof rzUsername !== 'string' || typeof rzPassword !== 'string') {
+            logger.warn('Invalid credential types', { rzUsername: typeof rzUsername });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid credentials format'
+            });
+        }
+
+        // Sanitize username (allow only alphanumeric and common chars)
+        if (!/^[a-zA-Z0-9._-]+$/.test(rzUsername)) {
+            logger.warn('Invalid username format', { rzUsername });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid username format'
+            });
+        }
+
+        // Check password length (basic validation)
+        if (rzPassword.length < 1 || rzPassword.length > 256) {
+            logger.warn('Invalid password length');
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid password'
+            });
+        }
+
         logger.info('Authentication attempt', { rzUsername });
 
-        const raumzeitResponse = await axios.post(`${RAUMZEIT_URL}/api/v1/persons`, {
-            login: rzUsername,
-            password: rzPassword
-        });
+        // Use HTTPS for Raumzeit API
+        const raumzeitResponse = await axios.post(
+            `${RAUMZEIT_URL}/api/v1/persons`,
+            {
+                login: rzUsername,
+                password: rzPassword
+            },
+            {
+                timeout: 10000, // 10 second timeout
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'NextcloudRegistration/1.0'
+                }
+            }
+        );
 
         logger.debug('Raumzeit API response', {
             status: raumzeitResponse.status,
@@ -195,7 +277,8 @@ app.post('/api/nextcloud/user', async (req, res) => {
                 `${NEXTCLOUD_URL}/ocs/v1.php/cloud/users/${rzUsername}`,
                 {
                     headers: {
-                        'OCS-APIRequest': 'true'
+                        'OCS-APIRequest': 'true',
+                        'Accept': 'application/json'
                     },
                     auth: {
                         username: NEXTCLOUD_ADMIN_USER,
@@ -204,7 +287,19 @@ app.post('/api/nextcloud/user', async (req, res) => {
                 }
             );
 
-            if (userCheckResponse.status === 200) {
+            // Nextcloud OCS API always returns HTTP 200, check the OCS status code instead
+            const ocsStatusCode = userCheckResponse.data?.ocs?.meta?.statuscode;
+            const ocsStatus = userCheckResponse.data?.ocs?.meta?.status;
+
+            logger.debug('User check response', {
+                rzUsername,
+                httpStatus: userCheckResponse.status,
+                ocsStatus,
+                ocsStatusCode
+            });
+
+            // If OCS status code is 100, user exists
+            if (ocsStatusCode === 100 || ocsStatus === 'ok') {
                 logger.warn('User already exists in Nextcloud', { rzUsername });
                 return res.status(409).json({
                     success: false,
@@ -212,17 +307,23 @@ app.post('/api/nextcloud/user', async (req, res) => {
                     username: rzUsername
                 });
             }
+
+            // If OCS status code is 404, user doesn't exist - proceed with creation
+            if (ocsStatusCode === 404 || ocsStatus === 'failure') {
+                logger.debug('User does not exist, proceeding with creation', { rzUsername });
+            }
         } catch (checkError) {
-            // If user doesn't exist, the API returns 404, which is expected
-            if (checkError.response && checkError.response.status !== 404) {
-                logger.error('Error checking user existence', {
-                    rzUsername,
-                    status: checkError.response?.status,
-                    message: checkError.message
-                });
+            // Network or other errors
+            logger.error('Error checking user existence', {
+                rzUsername,
+                status: checkError.response?.status,
+                message: checkError.message
+            });
+
+            // Only throw if it's not a network/connection error
+            if (checkError.code !== 'ECONNREFUSED' && checkError.code !== 'ENOTFOUND') {
                 throw checkError;
             }
-            logger.debug('User does not exist (404), proceeding with creation', { rzUsername });
         }
 
         logger.debug('Creating user in Nextcloud', { rzUsername, email });
@@ -236,7 +337,8 @@ app.post('/api/nextcloud/user', async (req, res) => {
             {
                 headers: {
                     'OCS-APIRequest': 'true',
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json'
                 },
                 auth: {
                     username: NEXTCLOUD_ADMIN_USER,
@@ -245,7 +347,21 @@ app.post('/api/nextcloud/user', async (req, res) => {
             }
         );
 
-        if (nextcloudResponse.status === 200) {
+        // Check OCS status code instead of HTTP status
+        const ocsStatusCode = nextcloudResponse.data?.ocs?.meta?.statuscode;
+        const ocsStatus = nextcloudResponse.data?.ocs?.meta?.status;
+        const ocsMessage = nextcloudResponse.data?.ocs?.meta?.message;
+
+        logger.debug('User creation response', {
+            rzUsername,
+            httpStatus: nextcloudResponse.status,
+            ocsStatus,
+            ocsStatusCode,
+            ocsMessage
+        });
+
+        // OCS status code 100 means success
+        if (ocsStatusCode === 100 || ocsStatus === 'ok') {
             logger.info('User created successfully in Nextcloud', { rzUsername, email });
             res.status(201).json({
                 success: true,
@@ -255,9 +371,15 @@ app.post('/api/nextcloud/user', async (req, res) => {
         } else {
             logger.error('Failed to create user in Nextcloud', {
                 rzUsername,
-                status: nextcloudResponse.status
+                ocsStatus,
+                ocsStatusCode,
+                ocsMessage
             });
-            throw new Error('Failed to create user in Nextcloud');
+            res.status(400).json({
+                success: false,
+                message: ocsMessage || 'Failed to create user in Nextcloud',
+                ocsStatusCode
+            });
         }
 
     } catch (error) {

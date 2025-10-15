@@ -87,7 +87,8 @@ export const RegisterPage: React.FC = () => {
                     type: 'success',
                     text: response.message || 'Registration successful! You can now log in.',
                 });
-                // Reset form
+
+                // Clear sensitive data from memory
                 setFormData({
                     rzUsername: '',
                     email: '',
@@ -100,6 +101,12 @@ export const RegisterPage: React.FC = () => {
                     type: 'error',
                     text: response.error || 'Registration failed. Please try again.',
                 });
+
+                // Clear password on error
+                setFormData((prev) => ({
+                    ...prev,
+                    rzPassword: '',
+                }));
             }
         } catch (error) {
             logger.error('Unexpected error during registration', error);
@@ -107,6 +114,12 @@ export const RegisterPage: React.FC = () => {
                 type: 'error',
                 text: 'An unexpected error occurred. Please try again later.',
             });
+
+            // Clear password on error
+            setFormData((prev) => ({
+                ...prev,
+                rzPassword: '',
+            }));
         } finally {
             setIsLoading(false);
         }
@@ -160,6 +173,10 @@ export const RegisterPage: React.FC = () => {
                             placeholder="Enter your RZ password"
                             disabled={isLoading}
                             className={errors.rzPassword ? 'error' : ''}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck="false"
                         />
                         {errors.rzPassword && <span className="error-text">{errors.rzPassword}</span>}
                     </div>

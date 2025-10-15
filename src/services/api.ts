@@ -45,10 +45,16 @@ class ApiService {
         // Request interceptor
         this.client.interceptors.request.use(
             (config) => {
+                // Don't log sensitive data (passwords)
+                const safeData = config.data ? { ...config.data } : {};
+                if (safeData.rzPassword) {
+                    safeData.rzPassword = '[REDACTED]';
+                }
+
                 logger.logApiRequest(
                     config.method?.toUpperCase() || 'GET',
                     config.url || '',
-                    config.data
+                    safeData
                 );
                 return config;
             },
