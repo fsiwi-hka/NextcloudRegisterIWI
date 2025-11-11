@@ -36,7 +36,7 @@ jobs:
           ssh_private_key: ${{ secrets.FRONTEND_SFTP_PRIVATE_KEY }}
           local_path: 'dist'
           remote_path: ${{ secrets.FRONTEND_REMOTE_PATH }}
-          sftp_only: true
+          sftp_only: false
           delete_remote_files: false
 
   deploy-backend:
