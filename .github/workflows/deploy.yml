@@ -1,0 +1,74 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy-frontend:
+    name: Build and Deploy Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Deploy frontend via SFTP
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          username: ${{ secrets.FRONTEND_SFTP_USERNAME }}
+          server: ${{ secrets.FRONTEND_SFTP_HOST }}
+          port: ${{ secrets.FRONTEND_SFTP_PORT || 22 }}
+          ssh_private_key: ${{ secrets.FRONTEND_SFTP_PRIVATE_KEY }}
+          local_path: './dist/*'
+          remote_path: ${{ secrets.FRONTEND_REMOTE_PATH }}
+          sftp_only: true
+          delete_remote_files: false
+
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy backend via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.BACKEND_SSH_HOST }}
+          username: ${{ secrets.BACKEND_SSH_USERNAME }}
+          key: ${{ secrets.BACKEND_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.BACKEND_SSH_PORT || 22 }}
+          script: |
+            # Navigate to deployment directory
+            cd ${{ secrets.BACKEND_REMOTE_PATH }}
+            
+            # Pull latest changes
+            git pull origin main
+            
+            # Navigate to backend directory
+            cd backend
+            
+            # Install dependencies
+            npm ci
+            
+            # Restart the backend service using PM2
+            pm2 restart nextcloud-register-backend || pm2 start server.js --name nextcloud-register-backend
+            
+            # Save PM2 process list
+            pm2 save
