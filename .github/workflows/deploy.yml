@@ -28,17 +28,15 @@ jobs:
         run: npm run build
 
       - name: Deploy frontend via SFTP
-        uses: sand4rt/ftp-deployer@v1.8
+        uses: Dylan700/sftp-upload-action@latest
         with:
-          sftp: true
-          host: ${{ secrets.FRONTEND_SFTP_HOST }}
+          server: ${{ secrets.FRONTEND_SFTP_HOST }}
           port: ${{ secrets.FRONTEND_SFTP_PORT || 22 }}
           username: ${{ secrets.FRONTEND_SFTP_USERNAME }}
-          password: ${{ secrets.FRONTEND_SFTP_PRIVATE_KEY }}
-          remote_folder: ${{ secrets.FRONTEND_REMOTE_PATH }}
-          local_folder: dist
-          cleanup: false
-          include: '["*", "**/*"]'
+          key: ${{ secrets.FRONTEND_SFTP_PRIVATE_KEY }}
+          uploads: |
+            dist/ => ${{ secrets.FRONTEND_REMOTE_PATH }}
+          delete: false
 
   deploy-backend:
     name: Deploy Backend
