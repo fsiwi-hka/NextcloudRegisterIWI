@@ -28,16 +28,17 @@ jobs:
         run: npm run build
 
       - name: Deploy frontend via SFTP
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        uses: sand4rt/ftp-deployer@v1.8
         with:
-          username: ${{ secrets.FRONTEND_SFTP_USERNAME }}
-          server: ${{ secrets.FRONTEND_SFTP_HOST }}
+          sftp: true
+          host: ${{ secrets.FRONTEND_SFTP_HOST }}
           port: ${{ secrets.FRONTEND_SFTP_PORT || 22 }}
-          ssh_private_key: ${{ secrets.FRONTEND_SFTP_PRIVATE_KEY }}
-          local_path: 'dist'
-          remote_path: ${{ secrets.FRONTEND_REMOTE_PATH }}
-          sftp_only: false
-          delete_remote_files: false
+          username: ${{ secrets.FRONTEND_SFTP_USERNAME }}
+          password: ${{ secrets.FRONTEND_SFTP_PRIVATE_KEY }}
+          remote_folder: ${{ secrets.FRONTEND_REMOTE_PATH }}
+          local_folder: dist
+          cleanup: false
+          include: '["*", "**/*"]'
 
   deploy-backend:
     name: Deploy Backend
