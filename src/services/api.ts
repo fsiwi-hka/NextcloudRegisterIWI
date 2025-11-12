@@ -91,7 +91,7 @@ class ApiService {
      */
     private async checkUserEligibility(authData: AuthCheckData): Promise<ApiResponse> {
         try {
-            const response = await this.client.post<ApiResponse>('/auth', authData);
+            const response = await this.client.post<ApiResponse>('/api/auth', authData);
             return {
                 success: true,
                 data: response.data,
@@ -116,7 +116,7 @@ class ApiService {
      */
     private async createNextcloudUser(userData: NextcloudUserData): Promise<ApiResponse> {
         try {
-            const response = await this.client.post<ApiResponse>('/nextcloud/user', userData);
+            const response = await this.client.post<ApiResponse>('/api/nextcloud/user', userData);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {
