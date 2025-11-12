@@ -415,7 +415,7 @@ app.post('/api/nextcloud/user', async (req, res) => {
             logger.info('User created successfully in Nextcloud', { rzUsername, email });
             res.status(201).json({
                 success: true,
-                message: 'User created successfully in Nextcloud',
+                message: 'User created successfully in Nextcloud - Check your email for finishing the registration.',
                 username: rzUsername
             });
         } else if (ocsStatusCode === 997) {
