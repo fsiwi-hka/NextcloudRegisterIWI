@@ -270,36 +270,61 @@ app.post('/api/nextcloud/user', async (req, res) => {
             });
         }
 
+        // Validate Nextcloud admin credentials
+        if (!NEXTCLOUD_ADMIN_USER || !NEXTCLOUD_ADMIN_PASSWORD) {
+            logger.error('Nextcloud admin credentials not configured', {
+                hasUser: !!NEXTCLOUD_ADMIN_USER,
+                hasPassword: !!NEXTCLOUD_ADMIN_PASSWORD
+            });
+            return res.status(500).json({
+                success: false,
+                message: 'Server configuration error: Nextcloud admin credentials not set'
+            });
+        }
+
         // Check if user already exists
         logger.debug('Checking if user exists in Nextcloud', { rzUsername });
         try {
             const userCheckResponse = await axios.get(
-                `${NEXTCLOUD_URL}/ocs/v1.php/cloud/users/${rzUsername}`,
+                `${NEXTCLOUD_URL}/ocs/v2.php/cloud/users/${rzUsername}`,
                 {
                     headers: {
                         'OCS-APIRequest': 'true',
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'Authorization': 'Basic ' + Buffer.from(`${NEXTCLOUD_ADMIN_USER}:${NEXTCLOUD_ADMIN_PASSWORD}`).toString('base64')
                     },
-                    auth: {
-                        username: NEXTCLOUD_ADMIN_USER,
-                        password: NEXTCLOUD_ADMIN_PASSWORD
-                    }
+                    validateStatus: (status) => status < 500 // Don't throw on 4xx errors
                 }
             );
 
-            // Nextcloud OCS API always returns HTTP 200, check the OCS status code instead
+            // Check HTTP status first
+            if (userCheckResponse.status === 401) {
+                logger.error('Nextcloud authentication failed - invalid admin credentials', {
+                    rzUsername,
+                    httpStatus: userCheckResponse.status,
+                    adminUser: NEXTCLOUD_ADMIN_USER
+                });
+                return res.status(500).json({
+                    success: false,
+                    message: 'Server configuration error: Invalid Nextcloud admin credentials'
+                });
+            }
+
+            // Nextcloud OCS API check the OCS status code
             const ocsStatusCode = userCheckResponse.data?.ocs?.meta?.statuscode;
             const ocsStatus = userCheckResponse.data?.ocs?.meta?.status;
+            const ocsMessage = userCheckResponse.data?.ocs?.meta?.message;
 
             logger.debug('User check response', {
                 rzUsername,
                 httpStatus: userCheckResponse.status,
                 ocsStatus,
-                ocsStatusCode
+                ocsStatusCode,
+                ocsMessage
             });
 
-            // If OCS status code is 100, user exists
-            if (ocsStatusCode === 100 || ocsStatus === 'ok') {
+            // If OCS status code is 100 or 200, user exists
+            if (ocsStatusCode === 100 || ocsStatusCode === 200 || ocsStatus === 'ok') {
                 logger.warn('User already exists in Nextcloud', { rzUsername });
                 return res.status(409).json({
                     success: false,
@@ -308,8 +333,8 @@ app.post('/api/nextcloud/user', async (req, res) => {
                 });
             }
 
-            // If OCS status code is 404, user doesn't exist - proceed with creation
-            if (ocsStatusCode === 404 || ocsStatus === 'failure') {
+            // If OCS status code is 404 or 998, user doesn't exist - proceed with creation
+            if (ocsStatusCode === 404 || ocsStatusCode === 998 || ocsStatus === 'failure') {
                 logger.debug('User does not exist, proceeding with creation', { rzUsername });
             }
         } catch (checkError) {
@@ -317,37 +342,62 @@ app.post('/api/nextcloud/user', async (req, res) => {
             logger.error('Error checking user existence', {
                 rzUsername,
                 status: checkError.response?.status,
-                message: checkError.message
+                statusCode: checkError.response?.data?.ocs?.meta?.statuscode,
+                message: checkError.message,
+                code: checkError.code
             });
 
-            // Only throw if it's not a network/connection error
+            // Only throw if it's not a network/connection error or expected 404
             if (checkError.code !== 'ECONNREFUSED' && checkError.code !== 'ENOTFOUND') {
+                // If it's a 401, return configuration error
+                if (checkError.response?.status === 401) {
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Server configuration error: Invalid Nextcloud admin credentials'
+                    });
+                }
                 throw checkError;
             }
         }
 
         logger.debug('Creating user in Nextcloud', { rzUsername, email });
+
+        // Create URLSearchParams for form data
+        const formData = new URLSearchParams();
+        formData.append('userid', rzUsername);
+        formData.append('email', email);
+        if (displayName) {
+            formData.append('displayName', displayName);
+        }
+
         const nextcloudResponse = await axios.post(
-            `${NEXTCLOUD_URL}/ocs/v1.php/cloud/users`,
-            {
-                userid: rzUsername,
-                email: email,
-                displayName: displayName || rzUsername
-            },
+            `${NEXTCLOUD_URL}/ocs/v2.php/cloud/users`,
+            formData.toString(),
             {
                 headers: {
                     'OCS-APIRequest': 'true',
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'Authorization': 'Basic ' + Buffer.from(`${NEXTCLOUD_ADMIN_USER}:${NEXTCLOUD_ADMIN_PASSWORD}`).toString('base64')
                 },
-                auth: {
-                    username: NEXTCLOUD_ADMIN_USER,
-                    password: NEXTCLOUD_ADMIN_PASSWORD
-                }
+                validateStatus: (status) => status < 500 // Don't throw on 4xx errors
             }
         );
 
-        // Check OCS status code instead of HTTP status
+        // Check HTTP status first
+        if (nextcloudResponse.status === 401) {
+            logger.error('Nextcloud authentication failed during user creation', {
+                rzUsername,
+                httpStatus: nextcloudResponse.status,
+                adminUser: NEXTCLOUD_ADMIN_USER
+            });
+            return res.status(500).json({
+                success: false,
+                message: 'Server configuration error: Invalid Nextcloud admin credentials'
+            });
+        }
+
+        // Check OCS status code
         const ocsStatusCode = nextcloudResponse.data?.ocs?.meta?.statuscode;
         const ocsStatus = nextcloudResponse.data?.ocs?.meta?.status;
         const ocsMessage = nextcloudResponse.data?.ocs?.meta?.message;
@@ -360,13 +410,22 @@ app.post('/api/nextcloud/user', async (req, res) => {
             ocsMessage
         });
 
-        // OCS status code 100 means success
-        if (ocsStatusCode === 100 || ocsStatus === 'ok') {
+        // OCS status code 100 or 200 means success
+        if (ocsStatusCode === 100 || ocsStatusCode === 200 || ocsStatus === 'ok') {
             logger.info('User created successfully in Nextcloud', { rzUsername, email });
             res.status(201).json({
                 success: true,
                 message: 'User created successfully in Nextcloud',
                 username: rzUsername
+            });
+        } else if (ocsStatusCode === 997) {
+            logger.error('Nextcloud authentication failed (OCS 997)', {
+                rzUsername,
+                adminUser: NEXTCLOUD_ADMIN_USER
+            });
+            res.status(500).json({
+                success: false,
+                message: 'Server configuration error: Invalid Nextcloud admin credentials'
             });
         } else {
             logger.error('Failed to create user in Nextcloud', {
