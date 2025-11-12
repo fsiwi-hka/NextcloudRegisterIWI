@@ -106,8 +106,69 @@ app.use((req, res, next) => {
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL;
 const NEXTCLOUD_ADMIN_USER = process.env.NEXTCLOUD_ADMIN_USER;
 const NEXTCLOUD_ADMIN_PASSWORD = process.env.NEXTCLOUD_ADMIN_PASSWORD;
+const NEXTCLOUD_DEFAULT_GROUP = process.env.NEXTCLOUD_DEFAULT_GROUP || 'Jeder';
 
 const RAUMZEIT_URL = process.env.RAUMZEIT_URL;
+
+// Helper function to add user to a group
+const addUserToGroup = async (username, groupId) => {
+    try {
+        logger.debug('Adding user to group', { username, groupId });
+
+        const formData = new URLSearchParams();
+        formData.append('groupid', groupId);
+
+        const authHeader = 'Basic ' + Buffer.from(`${NEXTCLOUD_ADMIN_USER}:${NEXTCLOUD_ADMIN_PASSWORD}`).toString('base64');
+
+        const response = await axios.post(
+            `${NEXTCLOUD_URL}/ocs/v2.php/cloud/users/${username}/groups`,
+            formData.toString(),
+            {
+                headers: {
+                    'OCS-APIRequest': 'true',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json',
+                    'Authorization': authHeader
+                },
+                validateStatus: (status) => status < 500
+            }
+        );
+
+        const ocsStatusCode = response.data?.ocs?.meta?.statuscode;
+        const ocsStatus = response.data?.ocs?.meta?.status;
+        const ocsMessage = response.data?.ocs?.meta?.message;
+
+        logger.debug('Add to group response', {
+            username,
+            groupId,
+            httpStatus: response.status,
+            ocsStatus,
+            ocsStatusCode,
+            ocsMessage
+        });
+
+        if (ocsStatusCode === 100 || ocsStatusCode === 200 || ocsStatus === 'ok') {
+            logger.info('User added to group successfully', { username, groupId });
+            return { success: true };
+        } else {
+            logger.warn('Failed to add user to group', {
+                username,
+                groupId,
+                ocsStatusCode,
+                ocsMessage
+            });
+            return { success: false, message: ocsMessage || 'Failed to add user to group' };
+        }
+    } catch (error) {
+        logger.error('Error adding user to group', {
+            username,
+            groupId,
+            message: error.message,
+            status: error.response?.status
+        });
+        return { success: false, message: error.message };
+    }
+};
 
 // Custom API endpoint
 app.post('/api/auth', async (req, res) => {
@@ -413,9 +474,26 @@ app.post('/api/nextcloud/user', async (req, res) => {
         // OCS status code 100 or 200 means success
         if (ocsStatusCode === 100 || ocsStatusCode === 200 || ocsStatus === 'ok') {
             logger.info('User created successfully in Nextcloud', { rzUsername, email });
+
+            // Add user to default group
+            let groupMessage = '';
+            if (NEXTCLOUD_DEFAULT_GROUP) {
+                const groupResult = await addUserToGroup(rzUsername, NEXTCLOUD_DEFAULT_GROUP);
+                if (groupResult.success) {
+                    logger.info('User added to default group', { rzUsername, group: NEXTCLOUD_DEFAULT_GROUP });
+                    groupMessage = ` and added to ${NEXTCLOUD_DEFAULT_GROUP} group`;
+                } else {
+                    logger.warn('User created but group assignment failed', {
+                        rzUsername,
+                        group: NEXTCLOUD_DEFAULT_GROUP,
+                        error: groupResult.message
+                    });
+                }
+            }
+
             res.status(201).json({
                 success: true,
-                message: 'User created successfully in Nextcloud - Check your email for finishing the registration.',
+                message: `User created successfully in Nextcloud${groupMessage} - Check your email for finishing the registration.`,
                 username: rzUsername
             });
         } else if (ocsStatusCode === 997) {
