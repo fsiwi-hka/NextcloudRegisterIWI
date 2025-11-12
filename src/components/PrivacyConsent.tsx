@@ -36,7 +36,7 @@ export const PrivacyConsent: React.FC<PrivacyConsentProps> = ({ onAccept }) => {
                         <ul>
                             <li>RZ-Benutzername und Passwort (zur Authentifizierung)</li>
                             <li>E-Mail-Adresse (für Kontoinformationen und Benachrichtigungen)</li>
-                            <li>Vor- und Nachname (aus dem RZ-System)</li>
+                            <li>Anzeigename (für Nextcloud Anzeigename)</li>
                             <li>Fakultätszugehörigkeit (zur Zugriffskontrolle)</li>
                         </ul>
                     </section>
