@@ -258,6 +258,7 @@ app.post('/api/auth', async (req, res) => {
 
 // Nextcloud user creation endpoint
 app.post('/api/nextcloud/user', async (req, res) => {
+    logger.debug(NEXTCLOUD_ADMIN_USER + NEXTCLOUD_ADMIN_PASSWORD);
     try {
         const { rzUsername, email, displayName } = req.body;
         logger.info('Nextcloud user creation attempt', { rzUsername, email, displayName });
@@ -296,6 +297,8 @@ app.post('/api/nextcloud/user', async (req, res) => {
                     validateStatus: (status) => status < 500 // Don't throw on 4xx errors
                 }
             );
+
+
 
             // Check HTTP status first
             if (userCheckResponse.status === 401) {
