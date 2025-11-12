@@ -142,6 +142,9 @@ export const PrivacyConsent: React.FC<PrivacyConsentProps> = ({ onAccept }) => {
                         <span className="required">*</span> Pflichtfelder - Sie müssen beide Bedingungen
                         akzeptieren, um fortzufahren.
                     </p>
+                    <p className="support-contact">
+                        Bei Problemen oder Fragen an Louis wenden - Discord: <strong>_starmaster_</strong>
+                    </p>
                 </div>
             </div>
         </div>

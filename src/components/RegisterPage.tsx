@@ -220,6 +220,9 @@ export const RegisterPage: React.FC = () => {
                     <p>
                         Already have an account? <a href="https://cloud.iwi-hka.de">Log in</a>
                     </p>
+                    <p className="support-contact">
+                        Bei Problemen oder Fragen an Louis wenden - Discord: <strong>_starmaster_</strong>
+                    </p>
                 </div>
             </div>
         </div>

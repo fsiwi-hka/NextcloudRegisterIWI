@@ -187,6 +187,12 @@
     margin: 0;
 }
 
+.register-footer .support-contact {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #E0E0E0;
+}
+
 .register-footer a {
     color: #4B8AE7;
     /* Medium Blue */

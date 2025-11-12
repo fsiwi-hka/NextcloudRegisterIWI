@@ -166,6 +166,12 @@
     margin-top: 12px;
 }
 
+.privacy-actions .support-contact {
+    margin-top: 16px;
+    font-size: 13px;
+    color: #E0E0E0;
+}
+
 /* Custom scrollbar for content area */
 .privacy-content::-webkit-scrollbar {
     width: 8px;
