@@ -421,7 +421,7 @@ app.post('/api/nextcloud/user', async (req, res) => {
             }
         }
 
-        logger.debug('Creating user in Nextcloud', { rzUsername, email });
+        logger.debug('Creating user in Nextcloud', { rzUsername, email, defaultGroup: NEXTCLOUD_DEFAULT_GROUP });
 
         // Create URLSearchParams for form data
         const formData = new URLSearchParams();
@@ -429,6 +429,10 @@ app.post('/api/nextcloud/user', async (req, res) => {
         formData.append('email', email);
         if (displayName) {
             formData.append('displayName', displayName);
+        }
+        // Add group during user creation (required by Nextcloud for sub-admins)
+        if (NEXTCLOUD_DEFAULT_GROUP) {
+            formData.append('groups[]', NEXTCLOUD_DEFAULT_GROUP);
         }
 
         const nextcloudResponse = await axios.post(
@@ -473,27 +477,16 @@ app.post('/api/nextcloud/user', async (req, res) => {
 
         // OCS status code 100 or 200 means success
         if (ocsStatusCode === 100 || ocsStatusCode === 200 || ocsStatus === 'ok') {
-            logger.info('User created successfully in Nextcloud', { rzUsername, email });
-
-            // Add user to default group
-            let groupMessage = '';
-            if (NEXTCLOUD_DEFAULT_GROUP) {
-                const groupResult = await addUserToGroup(rzUsername, NEXTCLOUD_DEFAULT_GROUP);
-                if (groupResult.success) {
-                    logger.info('User added to default group', { rzUsername, group: NEXTCLOUD_DEFAULT_GROUP });
-                    groupMessage = ` and added to ${NEXTCLOUD_DEFAULT_GROUP} group`;
-                } else {
-                    logger.warn('User created but group assignment failed', {
-                        rzUsername,
-                        group: NEXTCLOUD_DEFAULT_GROUP,
-                        error: groupResult.message
-                    });
-                }
-            }
+            const groupInfo = NEXTCLOUD_DEFAULT_GROUP ? ` and added to ${NEXTCLOUD_DEFAULT_GROUP} group` : '';
+            logger.info('User created successfully in Nextcloud', {
+                rzUsername,
+                email,
+                group: NEXTCLOUD_DEFAULT_GROUP || 'none'
+            });
 
             res.status(201).json({
                 success: true,
-                message: `User created successfully in Nextcloud${groupMessage} - Check your email for finishing the registration.`,
+                message: `User created successfully in Nextcloud${groupInfo} - Check your email for finishing the registration.`,
                 username: rzUsername
             });
         } else if (ocsStatusCode === 997) {
