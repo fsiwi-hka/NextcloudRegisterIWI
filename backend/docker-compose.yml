@@ -6,7 +6,7 @@ services:
     container_name: nextcloud-register-backend
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV}
       - PORT=${PORT}
       - NEXTCLOUD_URL=${NEXTCLOUD_URL}
       - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
