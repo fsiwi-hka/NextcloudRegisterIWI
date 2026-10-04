@@ -69,5 +69,5 @@ jobs:
             ${{ secrets.BACKEND_ENV_FILE }}
             EOF
             chmod 600 .env
-            # docker compose up -d --build --remove-orphans
-            # docker image prune -f
+            docker compose up -d --build --remove-orphans
+            docker image prune -f
