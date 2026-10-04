@@ -3,37 +3,66 @@ name: Build and Deploy
 on:
   push:
     branches: [main]
-  workflow_dispatch:   
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: fsiwi-hka/nextcloudregisteriwi   
+  IMAGE_NAME: fsiwi-hka/nextcloud-register-backend
 
 jobs:
-  build-and-push:
+  frontend:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_ENV: production
+
+      - name: Deploy frontend via SFTP
+        uses: Dylan700/sftp-upload-action@latest
+        with:
+          server: ${{ secrets.FRONTEND_SFTP_HOST }}
+          port: ${{ secrets.FRONTEND_SFTP_PORT || 22 }}
+          username: ${{ secrets.FRONTEND_SFTP_USERNAME }}
+          key: ${{ secrets.FRONTEND_SFTP_PRIVATE_KEY }}
+          uploads: |
+            dist/ => ${{ secrets.FRONTEND_REMOTE_PATH }}
+          delete: false
+
+  backend:
+    name: Build & Push Backend Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write       # required to push to GHCR
-
+      packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }} 
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./backend
+          file: ./backend/Dockerfile
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
@@ -41,25 +70,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    needs: build-and-push
+  deploy-backend:
+    name: Deploy Backend
+    needs: backend
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1
+      - name: Pull and restart on server
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.BACKEND_SSH_HOST }}
           username: ${{ secrets.BACKEND_SSH_USERNAME }}
           key: ${{ secrets.BACKEND_SSH_PRIVATE_KEY }}
-          port: 22
+          port: ${{ secrets.BACKEND_SSH_PORT || 22 }}
           script: |
             set -e
             cd ${{ secrets.BACKEND_REMOTE_PATH }}
             cat > .env <<'EOF'
-            ${{ secrets.ENV_FILE }}
+            ${{ secrets.BACKEND_ENV_FILE }}
             EOF
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker compose pull
-            docker compose up -d --remove-orphans
-            docker image prune -f
+            # docker compose pull
+            # docker compose up -d --remove-orphans
+            # docker image prune -f
